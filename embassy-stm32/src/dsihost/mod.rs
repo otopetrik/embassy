@@ -120,6 +120,12 @@ impl<'d, T: Instance> DsiHost<'d, T> {
     async fn enable_pll(&self) {
         let config = unsafe { DSI_CONFIG }.unwrap();
 
+        // Turn on DSI bias (RM0456, 44.14.1)
+        #[cfg(dsihost_u5)]
+        {
+            T::regs().bcfgr().modify(|w| w.set_pwrup(true));
+        }
+
         // Set the PLL configuration
         T::regs().wrpcr().modify(|w| {
             w.set_ndiv(config.ndiv);
