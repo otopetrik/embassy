@@ -113,7 +113,7 @@ impl DsiHostPllConfig {
 
 /// Enable the DSIHOST PLL
 pub fn configure_pll(hse: Option<Hertz>, config: DsiHostPllConfig) -> Hertz {
-    let pll_vco = hse.expect("DSI requires configured HSE") * config.idf * config.ndiv * 2u32;
+    let pll_vco = hse.expect("DSI requires configured HSE") / config.idf * config.ndiv * 2u32;
 
     #[cfg(feature = "defmt")]
     {
@@ -131,7 +131,7 @@ pub fn configure_pll(hse: Option<Hertz>, config: DsiHostPllConfig) -> Hertz {
         assert!(config.odf <= 511, "DSI PLL output division factor must be <= 511");
     }
 
-    let pll_freq = pll_vco / 2u32 * config.odf;
+    let pll_freq = pll_vco / config.odf;
 
     #[cfg(feature = "defmt")]
     {
