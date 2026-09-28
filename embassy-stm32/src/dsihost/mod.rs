@@ -13,7 +13,7 @@ use crate::interrupt::typelevel::Interrupt;
 use crate::peripherals::{self};
 use crate::rcc::dsi::DSI_CONFIG;
 use crate::rcc::{self, RccPeripheral};
-use crate::time::MaybeHertz;
+use crate::time::{Hertz, MaybeHertz};
 use crate::wait::block_for_us;
 use crate::{Peri, interrupt};
 
@@ -120,10 +120,60 @@ impl<'d, T: Instance> DsiHost<'d, T> {
     async fn enable_pll(&self) {
         let config = unsafe { DSI_CONFIG }.unwrap();
 
+        let hse = unsafe { crate::rcc::get_freqs() }
+            .hse
+            .to_hertz()
+            .expect("DSI PLL requires HSE");
+
+        let vco = config.vco(hse);
+        let pfd = config.pfd(hse);
+
+
         // Turn on DSI bias (RM0456, 44.14.1)
         #[cfg(dsihost_u5)]
         {
             T::regs().bcfgr().modify(|w| w.set_pwrup(true));
+
+
+            // rm0456, page 1847, 44.16.7 DSI_WRPCR
+            // TOOD: WRPCR does not have 'BC' (bits 29,30)
+            T::regs().wrpcr().modify(|w| {
+                const START: usize = 29usize;
+                const MASK: u32 = 0x3;
+
+                // 0 = 500 800Mhz
+                // 1 = 800-1000Mhz
+                let val = vco >= Hertz::mhz(800);
+
+                w.0 = (w.0 & !(MASK << START)) | (((val as u32) & MASK) << START);
+            });
+
+            // rm0456, page 1848, 44.16.8 DSI_WPTR
+            // TODO: register completely missing
+            let (lpf, cp) = match pfd {
+                Hertz(..2_000_000) => panic!("Invalid pdf: {:?} (too low)", pfd),
+                Hertz(2_000_000..4_400_000) => (0b0000,0b0000),
+                Hertz(4_400_000..14_100_000) => (0b0001,0b0001),
+                Hertz(14_100_000..30_900_000) => (0b0001,0b0000),
+                Hertz(30_900_000..45_700_000) => (0b0010,0b0011),
+                Hertz(45_700_000..50_000_000) => (0b0010,0b0010),
+                Hertz(50_000_000..) => panic!("Invalid pdf: {:?} (too high", pfd),
+            };
+
+            const LPF_START: usize = 12usize;
+            const LPF_MASK: u32 = 0b1111;
+
+            const CP_START: usize = 8usize;
+            const CP_MASK: u32 = 0b1111;
+
+            unsafe {
+                let wptr = T::regs().wrpcr().as_ptr().add(4) as *mut u32;
+                // read-first to not-to-change reserved values
+                let mut value = core::ptr::read_volatile(wptr);
+                value = (value & !(CP_MASK << CP_START)) | (((cp as u32) & CP_MASK) << CP_START);
+                value = (value & !(LPF_MASK << LPF_START)) | (((lpf as u32) & LPF_MASK) << LPF_START);
+                core::ptr::write_volatile(wptr, value);
+            }
         }
 
         // Set the PLL configuration

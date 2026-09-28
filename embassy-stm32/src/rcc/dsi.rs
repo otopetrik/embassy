@@ -109,6 +109,14 @@ impl DsiHostPllConfig {
 
         Self { ndiv, idf, odf }
     }
+
+    pub fn vco(&self, hse: Hertz) -> Hertz {
+        hse / self.idf * 2u32 * self.ndiv
+    }
+
+    pub fn pfd(&self, hse: Hertz) -> Hertz {
+        hse / self.idf
+    }
 }
 
 /// Enable the DSIHOST PLL
