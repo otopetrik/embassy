@@ -141,7 +141,7 @@ impl PixelFormat {
     pub const fn nibbles_per_pixel(&self) -> usize {
         match self {
             PixelFormat::Argb8888 => 8,
-            PixelFormat::Rgb888 => 8,
+            PixelFormat::Rgb888 => 6,
             PixelFormat::Rgb565 => 4,
             PixelFormat::Argb1555 => 4,
             PixelFormat::Argb4444 => 4,
@@ -160,7 +160,7 @@ impl PixelFormat {
     pub const fn bytes_per_pixel(&self) -> Option<usize> {
         match self {
             PixelFormat::Argb8888 => Some(4),
-            PixelFormat::Rgb888 => Some(4),
+            PixelFormat::Rgb888 => Some(3),
             PixelFormat::Rgb565 => Some(2),
             PixelFormat::Argb1555 => Some(2),
             PixelFormat::Argb4444 => Some(2),

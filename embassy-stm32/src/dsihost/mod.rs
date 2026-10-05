@@ -14,7 +14,7 @@ use crate::peripherals::{self};
 use crate::rcc::dsi::DSI_CONFIG;
 use crate::rcc::{self, RccPeripheral};
 use crate::time::{Hertz, MaybeHertz};
-use crate::wait::block_for_us;
+use crate::wait::{block_for_us, wait_for_us};
 use crate::{Peri, interrupt};
 
 mod phy;
@@ -134,6 +134,8 @@ impl<'d, T: Instance> DsiHost<'d, T> {
         {
             T::regs().bcfgr().modify(|w| w.set_pwrup(true));
 
+            // stm32u5xx_hal_dsi.c reference implementation claims 2ms delay is required
+            wait_for_us(2000).await;
 
             // rm0456, page 1847, 44.16.7 DSI_WRPCR
             // TOOD: WRPCR does not have 'BC' (bits 29,30)
@@ -167,7 +169,7 @@ impl<'d, T: Instance> DsiHost<'d, T> {
             const CP_MASK: u32 = 0b1111;
 
             unsafe {
-                let wptr = T::regs().wrpcr().as_ptr().add(4) as *mut u32;
+                let wptr =T::regs().as_ptr().add(0x0434) as *mut u32;
                 // read-first to not-to-change reserved values
                 let mut value = core::ptr::read_volatile(wptr);
                 value = (value & !(CP_MASK << CP_START)) | (((cp as u32) & CP_MASK) << CP_START);
@@ -214,6 +216,23 @@ impl<'d, T: Instance> DsiHost<'d, T> {
             }
         })
         .await;
+
+        // DEBUG:
+        {
+            let s = T::regs().wisr().read();
+            let w = T::regs().wrpcr().read();
+            defmt::debug!("(enable_pll, after poll_fn) DSI PLL: PLLEN={} PLLLS={} PLLLIF={} PLLUIF={} WRPCR={:08x}",w.pllen(), s.pllls(), s.plllif(), s.plluif(), w.0);
+        }
+
+        // NOTE: do _NOT switch from PLL3 to D-PHY PLL
+        // with PLL3 at least pss0 and pss1 get to true (pssc still remains false and casuses timeout)
+        /*
+        // switch from PLL3 to D-PHY PLL
+        crate::pac::RCC.ccipr2().modify(|w| {
+            w.set_dsisel(crate::pac::rcc::vals::Dsisel::DsiPhyDiv8)
+        })
+         */
+
     }
 
     /// Start the DSI host
