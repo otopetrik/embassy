@@ -37,9 +37,11 @@ pub struct BufferConfig {
 
 impl BufferConfig {
     /// Encode `base_addr` into BCR register fields.
+    ///
+    /// BCR (RM0456): bits 31:23 = PBBA (base, 8-Mbyte area), bits 22:4 = PBO (offset).
     fn encode(self) -> (u32, u16) {
         let pbo = (self.base_addr >> 4) & 0x0007_ffff;
-        let pbba = ((self.base_addr >> 22) & 0x01ff) as u16;
+        let pbba = ((self.base_addr >> 23) & 0x01ff) as u16;
         (pbo, pbba)
     }
 }
