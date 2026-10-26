@@ -177,6 +177,8 @@ pub struct LtdcLayerConfig {
     pub window_y0: u16,
     /// Window bottom y in pixels
     pub window_y1: u16,
+    /// Start of one line of pixels to start of next line of pixels, in bytes (needed for GFXMMU)
+    pub line_pitch_override: Option<u16>,
 }
 
 /// Pixel format
@@ -615,9 +617,14 @@ impl<'d, T: Instance, I: Interface> Ltdc<'d, T, I> {
         let width = layer_config.window_x1 - layer_config.window_x0;
         let height = layer_config.window_y1 - layer_config.window_y0;
 
+        let line_pitch = match layer_config.line_pitch_override {
+            None => width * bytes_per_pixel,
+            Some(line_pitch) => line_pitch,
+        };
+
         // framebuffer pitch and line length
         layer.cfblr().modify(|w| {
-            w.set_cfbp(width * bytes_per_pixel);
+            w.set_cfbp(line_pitch);
             #[cfg(ltdc_v1_3)]
             w.set_cfbll(width * bytes_per_pixel + 7);
             #[cfg(ltdc_v1)]

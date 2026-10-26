@@ -71,6 +71,16 @@ impl Default for Config {
     }
 }
 
+impl Config {
+    pub fn line_pitch(&self) -> u16 {
+        if self.block_mode_192 {
+            192 * BLOCK_SIZE as u16
+        } else {
+            256 * BLOCK_SIZE as u16
+        }
+    }
+}
+
 /// One LUT line entry.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
